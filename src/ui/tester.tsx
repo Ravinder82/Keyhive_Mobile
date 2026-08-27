@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type {
   CredentialMeta,
+  ModelInfo,
   ProviderCatalogEntry,
   TestOutcome,
 } from "../shared/types";
@@ -22,6 +23,7 @@ export function ApiTester(props: {
   const [model, setModel] = useState("");
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
+  const [refreshingModels, setRefreshingModels] = useState(false);
   const [outcome, setOutcome] = useState<TestOutcome | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,6 +57,28 @@ export function ApiTester(props: {
     props.onTested();
   }
 
+  async function refreshModels() {
+    if (!cred) return;
+    setRefreshingModels(true);
+    setError(null);
+    try {
+      const res = await sendToBackground<ModelInfo[]>({
+        type: "cred/fetchModels",
+        id: cred.id,
+      });
+      if (res.ok) {
+        // The credential's cachedModels are now updated; tell parent to refresh the dashboard.
+        props.onTested();
+      } else {
+        setError(res.message || "Failed to refresh models.");
+      }
+    } catch (err) {
+      setError("Failed to refresh models.");
+    } finally {
+      setRefreshingModels(false);
+    }
+  }
+
   if (!cred) {
     return (
       <section className="card" aria-label="API tester">
@@ -64,6 +88,11 @@ export function ApiTester(props: {
     );
   }
 
+  // Use cached models if available, otherwise fall back to the static catalog.
+  const availableModels = cred.cachedModels && cred.cachedModels.length > 0
+    ? cred.cachedModels
+    : (entry?.models ?? []);
+
   return (
     <section className="card" aria-label="API tester">
       <h3>Test API — {cred.label}</h3>
@@ -72,12 +101,12 @@ export function ApiTester(props: {
           <label>
             <span className="sr-only">Model</span>
             <select value={model} onChange={(e) => setModel(e.target.value)}>
-              {(entry?.models ?? []).map((m) => (
+              {availableModels.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.label}
                 </option>
               ))}
-              {model && !(entry?.models ?? []).some((m) => m.id === model) && (
+              {model && !availableModels.some((m) => m.id === model) && (
                 <option value={model}>{model}</option>
               )}
             </select>
@@ -90,6 +119,14 @@ export function ApiTester(props: {
             ) : (
               "Send test request"
             )}
+          </button>
+          <button
+            type="button"
+            onClick={refreshModels}
+            disabled={refreshingModels || !cred}
+            title="Fetch the latest model list from the provider using your API key"
+          >
+            {refreshingModels ? "Refreshing…" : "Refresh models"}
           </button>
         </div>
         <input

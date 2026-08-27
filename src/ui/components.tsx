@@ -153,3 +153,28 @@ export function EmptyState(props: { icon: string; title: string; children?: Reac
     </div>
   );
 }
+
+// ------------------------------------------------------------ DailyTotals
+
+export function DailyTotalsTable({ totals }: { totals: { date: string; requests: number; costUsd: number | null; tokens: number | null }[] }) {
+  if (totals.length === 0) return <p className="chart-summary">No daily data available.</p>;
+  return (
+    <div className="daily-totals-table">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Requests</th><th>Cost</th><th>Tokens</th></tr>
+        </thead>
+        <tbody>
+          {totals.map((d) => (
+            <tr key={d.date}>
+              <td>{d.date}</td>
+              <td>{d.requests}</td>
+              <td>{d.costUsd !== null ? `$${d.costUsd.toFixed(4)}` : '—'}</td>
+              <td>{d.tokens !== null ? d.tokens.toLocaleString() : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

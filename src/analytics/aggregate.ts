@@ -222,6 +222,40 @@ export function modelsWithoutPricing(events: UsageEvent[]): string[] {
   return [...out];
 }
 
+export function dailyTotals(
+  events: UsageEvent[],
+  range: RangeKey,
+  now = Date.now(),
+): { date: string; requests: number; costUsd: number | null; tokens: number | null }[] {
+  const inRange = inWindow(events, range, now);
+  if (inRange.length === 0) return [];
+  const map = new Map<string, { requests: number; cost: number; costKnown: boolean; tokens: number; tokensKnown: boolean }>();
+  for (const e of inRange) {
+    const d = new Date(e.timestamp);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const cur = map.get(dateStr) ?? { requests: 0, cost: 0, costKnown: false, tokens: 0, tokensKnown: false };
+    cur.requests += 1;
+    if (e.costAvailable && e.estimatedCostUsd !== undefined) {
+      cur.cost += e.estimatedCostUsd;
+      cur.costKnown = true;
+    }
+    const tokens = e.totalTokens ?? (e.inputTokens ?? 0) + (e.outputTokens ?? 0);
+    if (tokens > 0) {
+      cur.tokens += tokens;
+      cur.tokensKnown = true;
+    }
+    map.set(dateStr, cur);
+  }
+  // Sort by date ascending
+  const sorted = [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  return sorted.map(([date, v]) => ({
+    date,
+    requests: v.requests,
+    costUsd: v.costKnown ? round6(v.cost) : null,
+    tokens: v.tokensKnown ? v.tokens : null,
+  }));
+}
+
 function round6(n: number): number {
   return Math.round(n * 1e6) / 1e6;
 }

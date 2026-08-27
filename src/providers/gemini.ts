@@ -1,5 +1,6 @@
-import type { UsageMetadata } from "../shared/types";
+import type { ModelInfo, UsageMetadata } from "../shared/types";
 import { makeAdapter } from "./adapter-factory";
+import { fetchJson, readJsonBody } from "./http";
 
 interface GeminiBody {
   usageMetadata?: {
@@ -8,9 +9,35 @@ interface GeminiBody {
     totalTokenCount?: unknown;
   };
 }
+interface GeminiModelsResponse {
+  models?: Array<{ name: string; displayName?: string }>;
+}
 
 function num(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+async function fetchGeminiModels(apiKey: string): Promise<ModelInfo[]> {
+  try {
+    const res = await fetchJson(
+      "https://generativelanguage.googleapis.com/v1beta/models",
+      {
+        headers: { "x-goog-api-key": apiKey },
+      },
+      10000,
+    );
+    if (!res.ok) return [];
+    const body = await readJsonBody(res) as GeminiModelsResponse;
+    if (!body?.models || !Array.isArray(body.models)) return [];
+    return body.models
+      .filter((item) => item.name && item.name.startsWith("models/"))
+      .map((item) => ({
+        id: item.name.replace("models/", ""),
+        label: item.displayName || item.name.replace("models/", ""),
+      }));
+  } catch {
+    return [];
+  }
 }
 
 export function geminiEndpoint(model: string): string {
@@ -55,4 +82,5 @@ export const geminiAdapter = makeAdapter({
       totalTokens: total ?? (input ?? 0) + (output ?? 0),
     };
   },
+  fetchModels: fetchGeminiModels,
 });

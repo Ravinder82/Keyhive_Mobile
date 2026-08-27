@@ -17,6 +17,7 @@
 import {
   breakdown,
   buildSeries,
+  dailyTotals,
   inWindow,
   modelsWithoutPricing,
   recentActivity,
@@ -260,6 +261,23 @@ const handlers: Record<string, (req: never) => Promise<unknown>> = {
 
   "catalog/list": async () => listProviderCatalog(),
 
+  "cred/fetchModels": async (req: Extract<BgRequest, { type: "cred/fetchModels" }>) => {
+    const body = requireObject(req, "request");
+    const id = requireString(body.id, "Credential id", 128);
+    return withExclusiveLock(async () => {
+      const creds = await readCredentials();
+      const cred = creds.find(c => c.id === id);
+      if (!cred) throw new DomainError("not_found", "Credential not found.");
+      const adapter = getAdapter(cred.provider);
+      const models = await adapter.fetchModels(cred.apiKey);
+      const updatedCreds = creds.map(c =>
+        c.id === id ? { ...c, cachedModels: models } : c
+      );
+      await writeCredentials(updatedCreds);
+      return models;
+    });
+  },
+
   "test/run": async (req: Extract<BgRequest, { type: "test/run" }>) => {
     const body = requireObject(req, "request");
     const spec = requireObject(body.spec, "Test spec");
@@ -430,6 +448,26 @@ const handlers: Record<string, (req: never) => Promise<unknown>> = {
   },
 };
 
+// ------------------------------------------------------------ side panel
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.sidePanel.setOptions({
+    enabled: true,
+    path: 'dashboard.html?side=true'
+  }).catch(() => {
+    // Ignore; older Chrome versions may not support sidePanel.
+  });
+});
+
+chrome.action.onClicked.addListener((tab) => {
+  if (!tab.id) return;
+  // Try side panel; if it fails, fall back to opening a new tab.
+  chrome.sidePanel.open({ tabId: tab.id }).catch((err) => {
+    console.warn('Side panel open failed, falling back to tab:', err);
+    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
+  });
+});
+
 // ------------------------------------------------------------------ helpers
 
 function toMeta(c: CredentialMeta): CredentialMeta {
@@ -519,6 +557,7 @@ export function buildSnapshot(
       series: buildSeries(cur, range, now),
       modelBreakdown: breakdown(cur, (e) => e.model ?? "(unknown)"),
       recentFailures: recentActivity(cur, 5).filter((r) => r.status === "failure"),
+      dailyTotals: dailyTotals(cur, range, now),
       ...(lastTest ? { lastTest } : {}),
     };
   }

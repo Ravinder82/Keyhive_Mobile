@@ -1,12 +1,32 @@
-import type { UsageMetadata } from "../shared/types";
+import type { ModelInfo, UsageMetadata } from "../shared/types";
 import { makeAdapter } from "./adapter-factory";
+import { fetchJson, readJsonBody } from "./http";
 
 interface OpenAIChatBody {
   usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown };
 }
+interface OpenAIModelsResponse {
+  data?: Array<{ id: string }>;
+}
 
 function num(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+async function fetchOpenAIModels(apiKey: string): Promise<ModelInfo[]> {
+  try {
+    const res = await fetchJson(
+      "https://api.openai.com/v1/models",
+      { headers: { Authorization: `Bearer ${apiKey}` } },
+      10000,
+    );
+    if (!res.ok) return [];
+    const body = await readJsonBody(res) as OpenAIModelsResponse;
+    if (!body?.data || !Array.isArray(body.data)) return [];
+    return body.data.map((item) => ({ id: item.id, label: item.id }));
+  } catch {
+    return [];
+  }
 }
 
 export const openaiAdapter = makeAdapter({
@@ -48,4 +68,5 @@ export const openaiAdapter = makeAdapter({
     if (reported === undefined && derived === undefined) return undefined;
     return { inputTokens: input, outputTokens: output, totalTokens: reported ?? derived };
   },
+  fetchModels: fetchOpenAIModels,
 });

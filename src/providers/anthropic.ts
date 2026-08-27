@@ -1,12 +1,41 @@
-import type { UsageMetadata } from "../shared/types";
+import type { ModelInfo, UsageMetadata } from "../shared/types";
 import { makeAdapter } from "./adapter-factory";
+import { fetchJson, readJsonBody } from "./http";
 
 interface AnthropicBody {
   usage?: { input_tokens?: unknown; output_tokens?: unknown };
 }
+interface AnthropicModelsResponse {
+  data?: Array<{ id: string; display_name?: string }>;
+}
 
 function num(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+async function fetchAnthropicModels(apiKey: string): Promise<ModelInfo[]> {
+  try {
+    const res = await fetchJson(
+      "https://api.anthropic.com/v1/models",
+      {
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+      },
+      10000,
+    );
+    if (!res.ok) return [];
+    const body = await readJsonBody(res) as AnthropicModelsResponse;
+    if (!body?.data || !Array.isArray(body.data)) return [];
+    return body.data.map((item) => ({
+      id: item.id,
+      label: item.display_name || item.id,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export const anthropicAdapter = makeAdapter({
@@ -48,4 +77,5 @@ export const anthropicAdapter = makeAdapter({
         input !== undefined || output !== undefined ? (input ?? 0) + (output ?? 0) : undefined,
     };
   },
+  fetchModels: fetchAnthropicModels,
 });

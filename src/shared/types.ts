@@ -45,6 +45,7 @@ export interface CredentialMeta {
   createdAt: number;
   lastTestedAt?: number;
   lastTestStatus?: "success" | "failure";
+  cachedModels?: ModelInfo[];
 }
 
 /** Only ever exists inside the encrypted vault payload. */
@@ -261,6 +262,7 @@ export interface CredentialDashboardData {
   modelBreakdown: BreakdownEntry[];
   recentFailures: RecentActivityItem[];
   lastTest?: { at: number; ok: boolean };
+  dailyTotals?: { date: string; requests: number; costUsd: number | null; tokens: number | null }[];
 }
 
 export interface DashboardSnapshot {
@@ -339,7 +341,8 @@ export type BgRequest =
   | { type: "premium/deactivate" }
   | { type: "settings/set"; patch: Partial<ExtensionSettings> }
   | { type: "data/clearAnalytics" }
-  | { type: "data/deleteAll" };
+  | { type: "data/deleteAll" }
+  | { type: "cred/fetchModels"; id: string };
 
 export type BgResponse<T = unknown> =
   | { ok: true; data: T }

@@ -1,12 +1,35 @@
-import type { UsageMetadata } from "../shared/types";
+import type { ModelInfo, UsageMetadata } from "../shared/types";
 import { makeAdapter } from "./adapter-factory";
+import { fetchJson, readJsonBody } from "./http";
 
 interface OpenRouterBody {
   usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown };
 }
+interface OpenRouterModelsResponse {
+  data?: Array<{ id: string; name?: string }>;
+}
 
 function num(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+async function fetchOpenRouterModels(apiKey: string): Promise<ModelInfo[]> {
+  try {
+    const res = await fetchJson(
+      "https://openrouter.ai/api/v1/models",
+      { headers: { Authorization: `Bearer ${apiKey}` } },
+      10000,
+    );
+    if (!res.ok) return [];
+    const body = await readJsonBody(res) as OpenRouterModelsResponse;
+    if (!body?.data || !Array.isArray(body.data)) return [];
+    return body.data.map((item) => ({
+      id: item.id,
+      label: item.name || item.id,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export const openRouterAdapter = makeAdapter({

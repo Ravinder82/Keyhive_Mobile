@@ -19,6 +19,8 @@ interface AdapterConfig {
   headers(apiKey: string): Record<string, string>;
   requestBody(model: string, prompt: string, maxTokens: number): unknown;
   normalizeUsage(body: unknown): UsageMetadata | undefined;
+  /** Optional function to fetch live models from the provider using the API key. */
+  fetchModels?(apiKey: string): Promise<ModelInfo[]>;
 }
 
 export function makeAdapter(cfg: AdapterConfig): ProviderAdapter {
@@ -53,6 +55,12 @@ export function makeAdapter(cfg: AdapterConfig): ProviderAdapter {
     testConnection(args: SendTestArgs, costFn?: CostFn) {
       return adapter.sendTestRequest(args, costFn);
     },
+    fetchModels: cfg.fetchModels
+      ? (apiKey: string) => cfg.fetchModels!(apiKey)
+      : async () => {
+          // Fallback: return static models if no live fetch is implemented.
+          return cfg.models;
+        },
   };
   return adapter;
 }

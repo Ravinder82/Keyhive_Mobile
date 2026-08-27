@@ -36,6 +36,8 @@ export interface ProviderAdapter extends PipelineSpec {
   defaultModel(): string;
   /** Returns null when the key plausibly matches the provider's format. */
   validateConfiguration(apiKey: string): SanitizedError | null;
+  /** Fetch the latest model list from the provider using the given API key. */
+  fetchModels(apiKey: string): Promise<ModelInfo[]>;
   /** Full round trip; resolves to a sanitized outcome (never throws). */
   sendTestRequest(args: SendTestArgs, costFn?: CostFn): Promise<TestOutcome>;
   testConnection(args: SendTestArgs, costFn?: CostFn): Promise<TestOutcome>;

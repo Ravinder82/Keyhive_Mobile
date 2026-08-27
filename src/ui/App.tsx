@@ -9,6 +9,7 @@ import { RANGE_KEYS, sendToBackground } from "../shared/types";
 import { CostChart, LatencyTrend, UsageChart } from "./charts";
 import {
   BreakdownList,
+  DailyTotalsTable,
   EmptyState,
   InsightPanel,
   MetricCard,
@@ -276,6 +277,13 @@ export default function App({ surface }: { surface: "popup" | "expanded" }) {
                       <p className="chart-summary">Showing recent failures for this credential.</p>
                     )}
                   </div>
+
+                  {credData && credData.dailyTotals && credData.dailyTotals.length > 0 && (
+                    <div className="card">
+                      <h3>Daily breakdown</h3>
+                      <DailyTotalsTable totals={credData.dailyTotals} />
+                    </div>
+                  )}
                 </div>
 
                 <ApiTester
